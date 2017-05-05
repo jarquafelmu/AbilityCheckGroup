@@ -28,7 +28,11 @@
 	 * @param {string} name The a person who should be whispered instead, defaults to gm if
 	 *                      left blank but if supplied null it will output to everyone [optional]
 	 */
-	var sendFeedback = function (msg, name = "gm") {
+	var sendFeedback = function (msg, name) {
+		if (name === undefined) {
+			name = "gm";
+		}
+
 		let content = `${msg}`;
 		content = name !== null ? `/w "${name}" ${content}` : content;
 
@@ -42,12 +46,31 @@
 	 */
 	var sendError = function (msg, name = "gm") {
 		msg = `<span style="color: red; font-weight: bold;">${msg}</span>`;
-		if (name !== null) {
+
+		if (name === undefined) {
+			name = "gm";
 			sendFeedback(msg, name);
 		} else {
-			sendFeedback(msg);	
+			sendFeedback(msg);
 		}
-	}; 
+	};
+
+	const exceptions = (function () {
+		const selectionException = function (message) {
+			this.message = message;
+			this.name = "SelectionException";
+		}
+
+		const attributeDoesNotExistException = function (message) {
+			this.message = message;
+			this.name = "AttributeDoesNotExistException";
+		}
+
+		return {
+			AttributeDoesNotExistException: attributeDoesNotExistException,
+			SelectionException: selectionException
+	}
+	}());
 
 	/**
 	 * Contains methods which interact directly with the token or journal.
@@ -55,8 +78,6 @@
 	var token = (function () {
 		/**
 		 * Checks if a valid token exists in selection, returns first match.
-		 * 
-		 * Sends an error message if the currently selected item is not a token or if there is nothing being selected.
 		 * 
 		 * @param {any} selection the selected object
 		 *
@@ -70,9 +91,8 @@
 				// ReSharper disable once QualifiedExpressionIsNull
 				// ReSharper disable once PossiblyUnassignedProperty
 				!(graphic = getObj("graphic", selection[0]._id) || graphic.get("_subtype") !== "token") ||
-				graphic.get("isdrawing"))
-			{
-				return null;
+				graphic.get("isdrawing")) {
+				throw new exceptions.SelectionException("A token must be selected before using this script.");
 			}
 
 			return getObj("graphic", selection[0]._id);
@@ -85,7 +105,7 @@
 		 * @param {string} type the type of the attribute
 		 * @param {string} id the character id
 		 *
-		 * @return returns first match
+		 * @return returns first match, otherwise null
 		 */
 		var characterObjExists = function(name, type, charId) {
 			var retval = null;
@@ -276,7 +296,6 @@
 		 * @param {any} character A character object containing its name, its status as an npc, and its id
 		 */
 		const buildSaveButton = function (json, character) {
-			log("Entered buildSaveButton");
 			const lower = json.proper.toLowerCase();
 
 			let saveName = toSnakeCase(`${lower} save`);
@@ -325,7 +344,7 @@
 
 			// ensure that the attribute actually exists
 			if (!abilityGroups.hasOwnProperty(attr)) {
-				throw `"${attr}" is not a valid attribute.`;
+				throw new exceptions.AttributeDoesNotExistException(`"${attr}" is not a valid attribute.`);
 			}
 			
 			const abilityGroup = abilityGroups[attr];
@@ -389,8 +408,11 @@
 				const content = templates.rollTemplateChecks(json.title, json.skills, json.basic);
 
 				sendFeedback(content, character.name);
-			} catch (err) {
-				sendError(err);
+			} catch (e) {
+				if (e instanceof exceptions.AttributeDoesNotExistException) {
+					const message = `${e.name}: ${e.message}`;
+					sendError(message, sender);
+				}
 			}
 		};
 
@@ -411,33 +433,38 @@
 
 	/**
 	 * Handles the user input
-	 * @param {any} msg
+	 * @param {any} userInput
 	 */
-	var handleInput = function(msg) {
-		var args = msg.content;
-		const selection = msg.selected;
-		const sender = msg.who.replace(" (GM)", "");
+	var handleInput = function(userInput) {
+		var args = userInput.content;
+		const selection = userInput.selected;
+		const sender = userInput.who.replace(" (GM)", "");
 
-		if (msg.type !== "api") {
+		if (userInput.type !== "api") {
 			return;
 		}
 
 		if (args.indexOf(`!${fields.apiInvoke}`, "") === 0) { // ensure that we are actually being called
 			args = args.replace(`!${fields.apiInvoke}`, "").trim();
 
-			const character = token.getCharacterJournal(selection);
-			if (!character) {
-				sendError("Invalid selection", sender);
-				return;
-			}
+			try {
+				const character = token.getCharacterJournal(selection);
 
-			if (args.length !== 0) {
-				if (args.indexOf("-main") === 0) {
-					responseHandler.doMainResponse(character);
+				if (args.length !== 0) {
+					if (args.indexOf("-main") === 0) {
+						responseHandler.doMainResponse(character);
+					} else {
+						const attribute = getAttributeType(args);
+
+						responseHandler.doAttributeResponse(attribute, character);
+					}
+				}
+			} catch (e) {
+				if (e instanceof exceptions.SelectionException) {
+					const message = `${e.name}: ${e.message}`;
+					sendError(message, sender);
 				} else {
-					const attribute = getAttributeType(args);
-
-					responseHandler.doAttributeResponse(attribute, character);
+					sendError(e);
 				}
 			}
 		}
