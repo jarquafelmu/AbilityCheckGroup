@@ -55,19 +55,45 @@
 		}
 	};
 
+	/**
+	 * Contains methods for telling special exceptions
+	 */
 	const exceptions = (function () {
+		/**
+		 * Exception is used when the api invoker has failed to select a valid token
+		 * @param {any} message
+		 */
 		const selectionException = function (message) {
 			this.message = message;
 			this.name = "SelectionException";
 		}
 
+		/**
+		 * Exception is used when an attribute doesn't exist for a character.
+		 *
+		 * Example, if the api invoker requests something other than str|dex|con|int|wis|cha
+		 * 
+		 * @param {any} message
+		 */
 		const attributeDoesNotExistException = function (message) {
 			this.message = message;
 			this.name = "AttributeDoesNotExistException";
 		}
 
 		return {
+			/**
+			 * Exception is used when an attribute doesn't exist for a character.
+			 *
+			 * Example, if the api invoker requests something other than str|dex|con|int|wis|cha
+			 * 
+			 * @param {any} message
+			 */
 			AttributeDoesNotExistException: attributeDoesNotExistException,
+
+			/**
+			 * Exception is used when the api invoker has failed to select a valid token
+			 * @param {any} message
+			 */
 			SelectionException: selectionException
 	}
 	}());
@@ -92,7 +118,7 @@
 				// ReSharper disable once PossiblyUnassignedProperty
 				!(graphic = getObj("graphic", selection[0]._id) || graphic.get("_subtype") !== "token") ||
 				graphic.get("isdrawing")) {
-				throw new exceptions.SelectionException("A token must be selected before using this script.");
+				throw new exceptions.selectionException("A token must be selected before using this script.");
 			}
 
 			return getObj("graphic", selection[0]._id);
@@ -215,10 +241,21 @@
 			 * Contains templates which control the look of the api command buttons
 			 */
 			const buttons = (function () {
-				const macro = function (label, keyword, abilityName) {
-					return `[${label}](~${keyword}|${abilityName})`;
+				/**
+				 * Creates a button for rolling a character ability
+				 * @param {any} label the button label
+				 * @param {any} characterid the character id to be referenced by the roll command
+				 * @param {any} rollableCharacterAbility the name of the rollable character ability
+				 */
+				const macro = function (label, characterid, rollableCharacterAbility) {
+					return `[${label}](~${characterid}|${rollableCharacterAbility})`;
 				}
 
+				/**
+				 * Creates a button for invoking an api command
+				 * @param {any} label the button label
+				 * @param {any} command the command for the button to invoke
+				 */
 				const api = function (label, command) {
 					return `[${label}](!${fields.apiInvoke} -${command})`;
 				}
@@ -370,7 +407,7 @@
 
 			// ensure that the attribute actually exists
 			if (!abilityGroups.hasOwnProperty(attr)) {
-				throw new exceptions.AttributeDoesNotExistException(`"${attr}" is not a valid attribute.`);
+				throw new exceptions.attributeDoesNotExistException(`"${attr}" is not a valid attribute.`);
 			}
 			
 			const abilityGroup = abilityGroups[attr];
@@ -445,7 +482,19 @@
 		};
 
 		return {
+			/**
+			 * Builds the initial response which contains buttons for the six attributes.
+			 *
+			 * @param {any} character A character object containing its name, its status as an npc, and its id
+			 */
 			doMainResponse: doMainResponse,
+
+			/**
+			 * Builds the attribute response body. Which includes a general check, a saving thow and skills, if any.
+			 * 
+			 * @param {any} attr the requested attribute
+			 * @param {any} character A character object containing its name, its status as an npc, and its id
+			 */
 			doAttributeResponse: doAttributeResponse
 		};
 	}());
