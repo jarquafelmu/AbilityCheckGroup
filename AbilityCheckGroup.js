@@ -190,22 +190,48 @@
 		 * Contains a series of response templates including buttons and response bodies.
 		 */
 		const templates = (function () {
-			return {
-				rollTemplateMain: function(title, content) {
+			/**
+			 *  Contains templates which control how the look of the over all response looks
+			 */
+			const rollTemplates = (function () {
+				const main = function(title, content) {
 					return `&{template:desc} {{desc=**${title}**<br>${content}}}`;
-				},
-				rollTemplateChecks: function (title, skills, basic) {
+				}
+
+				const checks = function(title, skills, basic) {
 					let rollTemplate = `&{template:desc} {{desc=**${title}**<br>`;
 					rollTemplate += skills.content.length > 0 ? `${skills.title}<br>${skills.content}<br>` : "";
 					rollTemplate += `${basic.title}<br>${basic.content}}}`;
 					return rollTemplate;
-				},
-				macrobutton: function (label, keyword, abilityName) {
+				}
+
+				return {
+					main: main,
+					checks: checks
+				}
+			}());
+
+			/**
+			 * Contains templates which control the look of the api command buttons
+			 */
+			const buttons = (function () {
+				const macro = function (label, keyword, abilityName) {
 					return `[${label}](~${keyword}|${abilityName})`;
-				},
-				apibutton: function (label, command) {
+				}
+
+				const api = function (label, command) {
 					return `[${label}](!${fields.apiInvoke} -${command})`;
 				}
+
+				return {
+					macro: macro,
+					api: api
+				}
+			}());
+
+			return {
+				rollTemplates: rollTemplates,
+				buttons: buttons
 			};
 		}());
 
@@ -281,12 +307,12 @@
 		 * @param {any} json contains json corresponding with the requested attribute
 		 * @param {any} character A character object containing its name, its status as an npc, and its id
 		 */
-		const buildGeneralButton = function (json, who) {
+		const buildGeneralButton = function (json, character) {
 			const lower = json.proper.toLowerCase();
 
-			const base = who.isNpc ? toSnakeCase(`npc ${json.short.toLowerCase()}`) : lower;
+			const basic = character.isNpc ? toSnakeCase(`npc ${json.short.toLowerCase()}`) : lower;
 
-			return templates.macrobutton("General", who.id, base);
+			return templates.buttons.macro("General", character.id, basic);
 		}
 
 		/**
@@ -304,7 +330,7 @@
 				saveName = token.useNpcAttributeName(character.id, npcAttribute) ? npcAttribute : saveName;
 			}
 
-			return templates.macrobutton("Save", character.id, saveName);
+			return templates.buttons.macro("Save", character.id, saveName);
 		}
 
 		/**
@@ -313,14 +339,14 @@
 		 * @param {any} skill the skill needed to be built
 		 * @param {any} character A character object containing its name, its status as an npc, and its id
 		 */
-		const buildSkillButton = function(skill, who) {
+		const buildSkillButton = function (skill, character) {
 			let skillName = toSnakeCase(skill);
-			if (who.isNpc) {
+			if (character.isNpc) {
 				const npcAttribute = toSnakeCase(`npc ${skillName}`);
-				skillName = token.useNpcAttributeName(who.id, npcAttribute) ? npcAttribute : skillName;
+				skillName = token.useNpcAttributeName(character.id, npcAttribute) ? npcAttribute : skillName;
 			}
 
-			return `${templates.macrobutton(skill, who.id, skillName)} `;
+			return `${templates.buttons.macro(skill, character.id, skillName)} `;
 		}
 
 		/**
@@ -383,14 +409,14 @@
 			for (let key in abilityGroups) {
 				if (abilityGroups.hasOwnProperty(key)) {
 					const item = abilityGroups[key];
-					content += templates.apibutton(item.short, item.short.toLowerCase());
+					content += templates.buttons.api(item.short, item.short.toLowerCase());
 					if (key === "con") {
 						content += "<br>";
 					}
 				}
 			}
 			
-			content = templates.rollTemplateMain("Ability Checks", content.trim());
+			content = templates.rollTemplates.main("Ability Checks", content.trim());
 
 			sendFeedback(content, character.name);
 		};
@@ -399,19 +425,21 @@
 		 * Builds the attribute response body. Which includes a general check, a saving thow and skills, if any.
 		 * 
 		 * @param {any} attr the requested attribute
-		 * @param {any} character the person who will receive the response
+		 * @param {any} character A character object containing its name, its status as an npc, and its id
 		 */
 		const doAttributeResponse = function (attr, character) {
 			try {
 				const json = buildResponseJson(attr, character);
 
-				const content = templates.rollTemplateChecks(json.title, json.skills, json.basic);
+				const content = templates.rollTemplates.checks(json.title, json.skills, json.basic);
 
 				sendFeedback(content, character.name);
 			} catch (e) {
 				if (e instanceof exceptions.AttributeDoesNotExistException) {
 					const message = `${e.name}: ${e.message}`;
-					sendError(message, sender);
+					sendError(message);
+				} else {
+					sendError(e);
 				}
 			}
 		};
@@ -481,7 +509,7 @@
 	 * Alerts the log that this script is fully loaded
 	 */
 	const ready = function() {
-		log("Attributes and Skills Book ready.");
+		log(`${fields.feedbackName} ready.`);
 	};
 
 	return {
