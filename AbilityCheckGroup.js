@@ -9,7 +9,7 @@
 	const info = Object.freeze({
 		version: "0.9.1",
 		created: "4/25/2017",
-		lastupdate: "5/5/2017",
+		lastupdate: "5/6/2017",
 		author: "Sam T."
 	});
 
@@ -118,49 +118,11 @@
 				// ReSharper disable once PossiblyUnassignedProperty
 				!(graphic = getObj("graphic", selection[0]._id) || graphic.get("_subtype") !== "token") ||
 				graphic.get("isdrawing")) {
-				throw new exceptions.selectionException("A token must be selected before using this script.");
+				throw new exceptions.SelectionException("A token must be selected before using this script.");
 			}
 
 			return getObj("graphic", selection[0]._id);
 		};
-
-		/**
-		 * check if the character object exists, return first match
-		 *
-		 * @param {string} name	attribute name
-		 * @param {string} type the type of the attribute
-		 * @param {string} id the character id
-		 *
-		 * @return returns first match, otherwise null
-		 */
-		var characterObjExists = function(name, type, charId) {
-			var retval = null;
-			const obj = findObjs({
-				_type: type,
-				name: name,
-				_characterid: charId
-			});
-			if (obj.length > 0) {
-				retval = obj[0];
-			}
-			return retval;
-		};
-
-		/**
-		 * Retrieves the value for the attribute
-		 * 
-		 * @param {any} attribute the attribute
-		 *
-		 * @return the attribute value, otherwise null.
-		 */
-		const getAttributeValue = function(attribute)
-		{
-			if (attribute) {
-				return attribute.get("current");
-			} else {
-				return null;
-			}
-		}
 
 		/**
 		 * Gets the character journal object for which the token represents.
@@ -177,8 +139,8 @@
 			const journal = getObj("character", curToken.get("represents"));
 			if (journal) {
 				const id = journal.get("_id");
-				const name = getAttributeValue(characterObjExists("name", "attribute", id)) || journal.get("name");
-				const isNpc = getAttributeValue(characterObjExists("npc", "attribute", id)) === "1";
+				const name = getAttrByName(id, "name") || journal.get("name");
+				const isNpc = getAttrByName(id, "npc") === "1";
 
 				return { name: name, id: id, isNpc: isNpc};
 			}
@@ -195,7 +157,7 @@
 		 * @return true if attribute exists, otherwise false.
 		 */
 		const useNpcAttributeName = function (id, attribute) {
-			const result = parseInt(getAttributeValue(characterObjExists(`${attribute}_flag`, "attribute", id)));
+			const result = parseInt(getAttrByName(id, `${attribute}_flag`));
 			return result > 0;
 		};
 
@@ -407,7 +369,7 @@
 
 			// ensure that the attribute actually exists
 			if (!abilityGroups.hasOwnProperty(attr)) {
-				throw new exceptions.attributeDoesNotExistException(`"${attr}" is not a valid attribute.`);
+				throw new exceptions.AttributeDoesNotExistException(`"${attr}" is not a valid attribute.`);
 			}
 			
 			const abilityGroup = abilityGroups[attr];
